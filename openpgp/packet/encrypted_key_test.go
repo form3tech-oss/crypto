@@ -13,6 +13,8 @@ import (
 	"io"
 	"math/big"
 	"testing"
+
+	"golang.org/x/crypto/rsa"
 )
 
 func bigFromBase10(s string) *big.Int {
@@ -36,6 +38,7 @@ var encryptedKeyRSAPriv = &rsa.PrivateKey{
 var encryptedKeyPriv = &PrivateKey{
 	PublicKey: PublicKey{
 		PubKeyAlgo: PubKeyAlgoRSA,
+		KeyId: 0x2a67d68660df41c7,
 	},
 	PrivateKey: encryptedKeyRSAPriv,
 }
@@ -152,12 +155,12 @@ func TestRSADecrypter(t *testing.T) {
 func TestEncryptingEncryptedKey(t *testing.T) {
 	key := []byte{1, 2, 3, 4}
 	const expectedKeyHex = "01020304"
-	const keyId = 42
+	const keyId = 0x2a67d68660df41c7
 
 	pub := &PublicKey{
 		PublicKey:  &encryptedKeyPub,
 		KeyId:      keyId,
-		PubKeyAlgo: PubKeyAlgoRSAEncryptOnly,
+		PubKeyAlgo: PubKeyAlgoRSA,
 	}
 
 	buf := new(bytes.Buffer)
@@ -177,7 +180,7 @@ func TestEncryptingEncryptedKey(t *testing.T) {
 		return
 	}
 
-	if ek.KeyId != keyId || ek.Algo != PubKeyAlgoRSAEncryptOnly {
+	if ek.KeyId != keyId || ek.Algo != PubKeyAlgoRSA {
 		t.Errorf("unexpected EncryptedKey contents: %#v", ek)
 		return
 	}

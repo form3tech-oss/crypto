@@ -600,7 +600,7 @@ func (k ed25519PublicKey) CryptoPublicKey() crypto.PublicKey {
 }
 
 func supportedEllipticCurve(curve elliptic.Curve) bool {
-	return curve == elliptic.P256() || curve == elliptic.P384() || curve == elliptic.P521()
+	return curve == elliptic.P256() || curve == elliptic.P384() || curve == elliptic.P521() || curve == bitcurves.S256()
 }
 
 // ecHash returns the hash to match the given elliptic curve, see RFC
