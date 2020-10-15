@@ -5,6 +5,8 @@
 package packet
 
 import (
+	"crypto"
+	"crypto/rsa"
 	"encoding/binary"
 	"io"
 	"math/big"
@@ -98,8 +100,9 @@ func (e *EncryptedKey) Decrypt(priv *PrivateKey, config *Config) error {
 	// padding oracle attacks.
 	switch priv.PubKeyAlgo {
 	case PubKeyAlgoRSA, PubKeyAlgoRSAEncryptOnly:
-		k := priv.PrivateKey.(*rsa.PrivateKey)
-		b, err = rsa.DecryptPKCS1v15(config.Random(), k, padToKeySize(&k.PublicKey, e.encryptedMPI1.Bytes()))
+		// Supports both *rsa.PrivateKey and crypto.Decrypter
+		k := priv.PrivateKey.(crypto.Decrypter)
+		b, err = k.Decrypt(config.Random(), padToKeySize(k.Public().(*rsa.PublicKey), e.encryptedMPI1.bytes), nil)
 	case PubKeyAlgoElGamal:
 		c1 := new(big.Int).SetBytes(e.encryptedMPI1.Bytes())
 		c2 := new(big.Int).SetBytes(e.encryptedMPI2.Bytes())
