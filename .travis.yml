@@ -1,7 +1,8 @@
 language: go
-script: go test -short ./...
-go_import_path: golang.org/x/crypto
+
 go:
-- 1.10.x
-- 1.11.x
-- master
+- 1.14.x
+- 1.15.x
+
+script: go test ./...
+
