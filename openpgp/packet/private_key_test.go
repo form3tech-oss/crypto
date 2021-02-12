@@ -10,15 +10,12 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
 	"hash"
-	"io"
 	"testing"
 	"time"
-
-	"golang.org/x/crypto/ed25519"
-	"golang.org/x/crypto/rsa"
 )
 
 var privateKeyTests = []struct {
@@ -68,51 +65,6 @@ func TestPrivateKeyRead(t *testing.T) {
 	}
 }
 
-func TestPrivateKeyEncrypt(t *testing.T) {
-	for i, test := range privateKeyTests {
-		packet, err := Read(readerFromHex(test.privateKeyHex))
-		if err != nil {
-			t.Errorf("#%d: failed to parse: %s", i, err)
-			continue
-		}
-
-		privKey := packet.(*PrivateKey)
-
-		if !privKey.Encrypted {
-			t.Errorf("#%d: private key isn't encrypted", i)
-			continue
-		}
-
-		err = privKey.Decrypt([]byte("testing"))
-		if err != nil {
-			t.Errorf("#%d: failed to decrypt: %s", i, err)
-			continue
-		}
-
-		err = privKey.Encrypt([]byte("wrong password"))
-		if err != nil {
-			t.Errorf("#%d: failed to encrypt: %s", i, err)
-			continue
-		}
-
-		err = privKey.Decrypt([]byte("testing"))
-		if err == nil {
-			t.Errorf("#%d: decrypted with incorrect key", i)
-			continue
-		}
-
-		err = privKey.Decrypt([]byte("wrong password"))
-		if err != nil {
-			t.Errorf("#%d: failed to decrypt: %s", i, err)
-			continue
-		}
-
-		if !privKey.CreationTime.Equal(test.creationTime) || privKey.Encrypted {
-			t.Errorf("#%d: bad result, got: %#v", i, privKey)
-		}
-	}
-}
-
 func populateHash(hashFunc crypto.Hash, msg []byte) (hash.Hash, error) {
 	h := hashFunc.New()
 	if _, err := h.Write(msg); err != nil {
@@ -129,16 +81,7 @@ func TestRSAPrivateKey(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	xrsaPriv := &rsa.PrivateKey{
-		PublicKey: rsa.PublicKey{
-			E: rsaPriv.PublicKey.E,
-			N: rsaPriv.PublicKey.N,
-		},
-		D: rsaPriv.D,
-		Primes: rsaPriv.Primes,
-	}
-	xrsaPriv.Precompute()
-	if err := NewRSAPrivateKey(time.Now(), xrsaPriv).Serialize(&buf); err != nil {
+	if err := NewRSAPrivateKey(time.Now(), rsaPriv).Serialize(&buf); err != nil {
 		t.Fatal(err)
 	}
 
@@ -269,52 +212,6 @@ func TestECDSASignerPrivateKey(t *testing.T) {
 
 	sig := &Signature{
 		PubKeyAlgo: PubKeyAlgoECDSA,
-		Hash:       crypto.SHA256,
-	}
-	msg := []byte("Hello World!")
-
-	h, err := populateHash(sig.Hash, msg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := sig.Sign(h, priv, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	if h, err = populateHash(sig.Hash, msg); err != nil {
-		t.Fatal(err)
-	}
-	if err := priv.VerifySignature(h, sig); err != nil {
-		t.Fatal(err)
-	}
-}
-
-type eddsaSigner struct {
-	priv ed25519.PrivateKey
-}
-
-func (s *eddsaSigner) Public() crypto.PublicKey {
-	return s.priv.Public()
-}
-
-func (s *eddsaSigner) Sign(rand io.Reader, msg []byte, opts crypto.SignerOpts) ([]byte, error) {
-	return s.priv.Sign(rand, msg, opts)
-}
-
-func TestEdDSASignerPrivateKey(t *testing.T) {
-	_, eddsaPriv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	priv := NewSignerPrivateKey(time.Now(), &eddsaSigner{eddsaPriv})
-
-	if priv.PubKeyAlgo != PubKeyAlgoEdDSA {
-		t.Fatal("NewSignerPrivateKey should have made a EdDSA private key")
-	}
-
-	sig := &Signature{
-		PubKeyAlgo: PubKeyAlgoEdDSA,
 		Hash:       crypto.SHA256,
 	}
 	msg := []byte("Hello World!")
