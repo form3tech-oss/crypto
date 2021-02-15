@@ -20,14 +20,13 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/crypto/openpgp"
 	"golang.org/x/crypto/openpgp/armor"
 	"golang.org/x/crypto/openpgp/errors"
 	"golang.org/x/crypto/openpgp/packet"
 )
 
 // A Block represents a clearsigned message. A signature on a Block can
-// be checked by calling Block.VerifySignature.
+// be checked by passing Bytes into openpgp.CheckDetachedSignature.
 type Block struct {
 	Headers          textproto.MIMEHeader // Optional unverified Hash headers
 	Plaintext        []byte               // The original message text
@@ -130,10 +129,8 @@ func Decode(data []byte) (b *Block, rest []byte) {
 		if key != "Hash" {
 			return nil, data
 		}
-		for _, val := range strings.Split(val, ",") {
-			val = strings.TrimSpace(val)
-			b.Headers.Add(key, val)
-		}
+		val = strings.TrimSpace(val)
+		b.Headers.Add(key, val)
 	}
 
 	firstLine := true
@@ -398,25 +395,6 @@ func EncodeMulti(w io.Writer, privateKeys []*packet.PrivateKey, config *packet.C
 	return
 }
 
-// VerifySignature checks a clearsigned message signature, and checks that the
-// hash algorithm in the header matches the hash algorithm in the signature.
-func (b *Block) VerifySignature(keyring openpgp.KeyRing, config *packet.Config) (signer *openpgp.Entity, err error) {
-	var expectedHashes []crypto.Hash
-	for _, v := range b.Headers {
-		for _, name := range v {
-			expectedHash := nameToHash(name)
-			if uint8(expectedHash) == 0 {
-				return nil, errors.StructuralError("unknown hash algorithm in cleartext message headers")
-			}
-			expectedHashes = append(expectedHashes, expectedHash)
-		}
-	}
-	if len(expectedHashes) == 0 {
-		expectedHashes = append(expectedHashes, crypto.MD5)
-	}
-	return openpgp.CheckDetachedSignatureAndHash(keyring, bytes.NewBuffer(b.Bytes), b.ArmoredSignature.Body, expectedHashes, config)
-}
-
 // nameOfHash returns the OpenPGP name for the given hash, or the empty string
 // if the name isn't known. See RFC 4880, section 9.4.
 func nameOfHash(h crypto.Hash) string {
@@ -437,26 +415,4 @@ func nameOfHash(h crypto.Hash) string {
 		return "SHA512"
 	}
 	return ""
-}
-
-// nameToHash returns a hash for a given OpenPGP name, or 0
-// if the name isn't known. See RFC 4880, section 9.4.
-func nameToHash(h string) crypto.Hash {
-	switch h {
-	case "MD5":
-		return crypto.MD5
-	case "SHA1":
-		return crypto.SHA1
-	case "RIPEMD160":
-		return crypto.RIPEMD160
-	case "SHA224":
-		return crypto.SHA224
-	case "SHA256":
-		return crypto.SHA256
-	case "SHA384":
-		return crypto.SHA384
-	case "SHA512":
-		return crypto.SHA512
-	}
-	return crypto.Hash(0)
 }
